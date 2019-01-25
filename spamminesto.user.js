@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Ylilauta Spamminesto
-// @match *://ylilauta.org/*
+// @match *://ylilauta.org/satunnainen/*
 // @exclude *://ylilauta.org/hiddenthreads
 // @grant none
 // @version 0.1
