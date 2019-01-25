@@ -3,7 +3,7 @@
 // @match *://ylilauta.org/satunnainen/*
 // @exclude *://ylilauta.org/hiddenthreads
 // @grant none
-// @version 0.1
+// @version 0.2
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
@@ -71,7 +71,7 @@ for(let answer of answers) {
       postMap[text] = 1;
     else
       postMap[text]++;
-    if (postMap[text] !== undefined && postMap[text]>1)
+    if (postMap[text] !== undefined && postMap[text]>1 && text != "")
       hidePost(answer, ".post-hide");
     else if (countDuplicates(answer, 1))
       hidePost(answer, ".post-hide");
