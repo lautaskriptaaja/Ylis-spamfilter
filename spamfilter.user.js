@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name Ylilauta Blacklist
+// @name Ylilauta Spamminesto
 // @match *://ylilauta.org/*
 // @exclude *://ylilauta.org/hiddenthreads
 // @grant none
