@@ -9,7 +9,8 @@
 // ==/UserScript==
 var blacklist = [
   "💩",
-  "██████"
+  "██",
+  "󠀡"
 ];
 
 function hidePost(post, style) {
