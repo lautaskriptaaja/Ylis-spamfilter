@@ -3,7 +3,7 @@
 // @match *://ylilauta.org/satunnainen/*
 // @exclude *://ylilauta.org/hiddenthreads
 // @grant none
-// @version 0.2
+// @version 0.21
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
