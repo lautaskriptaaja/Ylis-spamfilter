@@ -14,8 +14,6 @@ var blacklist = [
 
 function hidePost(post, style) {
   setTimeout(function() {
-    console.log(style)
-    console.log(post);
     post.querySelector(style).click();
   }, 100)
 }
