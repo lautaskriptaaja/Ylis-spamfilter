@@ -3,7 +3,7 @@
 // @match *://ylilauta.org/satunnainen/*
 // @exclude *://ylilauta.org/hiddenthreads
 // @grant none
-// @version 0.26
+// @version 0.27
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
@@ -32,6 +32,8 @@ function countDuplicates(post, number) {
   const ratio = wordcount / splitted.length;
 
   if (wordcount > 0 && ratio < 0.1)
+    return true;
+  else if (wordcount > 0 && getPostText(post,number).length / wordcount > 300)
     return true;
   else
     return false;
