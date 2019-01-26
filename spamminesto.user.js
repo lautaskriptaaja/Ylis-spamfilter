@@ -3,7 +3,7 @@
 // @match *://ylilauta.org/satunnainen/*
 // @exclude *://ylilauta.org/hiddenthreads
 // @grant none
-// @version 0.27
+// @version 0.3
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
@@ -106,3 +106,13 @@ if (catalog) {
     }
   }
 }
+setTimeout(function() {
+  var hiddenAnswers = document.querySelectorAll(".answer.hidden");
+  for (let hidden of hiddenAnswers) {
+    console.log(hidden);
+    hidden.parentNode.removeChild(hidden);
+  }
+  var hiddenThreads = document.querySelectorAll(".just-hidden");
+  for (let thread of hiddenThreads)
+    thread.parentNode.removeChild(thread);
+}, 300)
