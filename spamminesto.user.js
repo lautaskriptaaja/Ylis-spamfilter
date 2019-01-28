@@ -4,7 +4,7 @@
 // @exclude *://ylilauta.org/hiddenthreads
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/blacklist.txt
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/runsafely.user.js
-// @version 0.5
+// @version 0.51
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
@@ -141,6 +141,8 @@ function detectForeign(text) {
 
 //tunnistetaan mahdollinen floodi
 function detectFlood(post) {
+  if (!enable_flood_restriction)
+    return false;
   let text = getPostText(post);
   let rows=text.split(/\r\n|\r|\n/).length;
   if (rows<10)
