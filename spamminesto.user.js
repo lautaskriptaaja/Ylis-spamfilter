@@ -1,18 +1,39 @@
 // ==UserScript==
 // @name Ylilauta Spamminesto
-// @match *://ylilauta.org/satunnainen/*
+// @match *://ylilauta.org/satunnainen*
 // @exclude *://ylilauta.org/hiddenthreads
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/blacklist.txt
-// @grant none
-// @version 0.4
+// @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/runsafely.user.js
+// @version 0.5
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
 
-var blacklistEmojis=false; //MUUTA true JOS HALUAT PIILOTTAA POSTAUKSET MISSÄ ON EMOJEITA
+let blacklist_enabled=true; //muuttujaksi asetuksiin
+let using_common_blacklist=true; //muuttujaksi asetuksiin
+let blacklist_words = []; //muuttujaksi asetuksiin, tähän voi lisätä omia mustalista-sanoja, syntaksilla: ["sana1", "sana2", "lause kolmonen"];
+let blacklistEmojis=false; //muuttujaksi asetuksiin
+let detect_minutes=180; //muuttujaksi asetuksiin, kyseessä kuinka monta minuuttia postauksen jälkeen hidetetään tismalleen samat viestit
+let hide_pastas=true; //muuttujaksi asetuksiin, hidettää pastat
+let pasta_expire_hours = 336; //muuttujaksi asetuksiin, hidettää pastan tällä aikavälillä, oletuksena 2 viikkoa
+let hide_foreign_texts=true; //muuttujaksi asetuksiin, hidettää mikäli tunnistaa muuksi kuin suomen- tai englanninkieleksi, toimii laajalti myös emojispämmiin
+let foreign_threshold=0.1; //muuttujaksi asetuksiin, jos tekstissä on enemmän kuin tämän verran ihmemerkkejä, hideen suoraan
+let enable_flood_restriction=true; //muuttujaksi asetuksiin, melko tiukka floodin esto -menetelmä, optimointivaraa
+let detect_flood_minutes=5; //kuinka pitkältä ajalta hakee floodia
+let LocalStorage;
+let emojiPattern=/(?:[\u2700-\u27bf]|(?:\ud83c[\udde6-\uddff]){2}|[\ud800-\udbff][\udc00-\udfff]|[\u0023-\u0039]\ufe0f?\u20e3|\u3299|\u3297|\u303d|\u3030|\u24c2|\ud83c[\udd70-\udd71]|\ud83c[\udd7e-\udd7f]|\ud83c\udd8e|\ud83c[\udd91-\udd9a]|\ud83c[\udde6-\uddff]|[\ud83c[\ude01\uddff]|\ud83c[\ude01-\ude02]|\ud83c\ude1a|\ud83c\ude2f|[\ud83c[\ude32\ude02]|\ud83c\ude1a|\ud83c\ude2f|\ud83c[\ude32-\ude3a]|[\ud83c[\ude50\ude3a]|\ud83c[\ude50-\ude51]|\u203c|\u2049|[\u25aa-\u25ab]|\u25b6|\u25c0|[\u25fb-\u25fe]|\u00a9|\u00ae|\u2122|\u2139|\ud83c\udc04|[\u2600-\u26FF]|\u2b05|\u2b06|\u2b07|\u2b1b|\u2b1c|\u2b50|\u2b55|\u231a|\u231b|\u2328|\u23cf|[\u23e9-\u23f3]|[\u23f8-\u23fa]|\ud83c\udccf|\u2934|\u2935|[\u2190-\u21ff])/g;
 
-var emojiPattern=/(?:[\u2700-\u27bf]|(?:\ud83c[\udde6-\uddff]){2}|[\ud800-\udbff][\udc00-\udfff]|[\u0023-\u0039]\ufe0f?\u20e3|\u3299|\u3297|\u303d|\u3030|\u24c2|\ud83c[\udd70-\udd71]|\ud83c[\udd7e-\udd7f]|\ud83c\udd8e|\ud83c[\udd91-\udd9a]|\ud83c[\udde6-\uddff]|[\ud83c[\ude01\uddff]|\ud83c[\ude01-\ude02]|\ud83c\ude1a|\ud83c\ude2f|[\ud83c[\ude32\ude02]|\ud83c\ude1a|\ud83c\ude2f|\ud83c[\ude32-\ude3a]|[\ud83c[\ude50\ude3a]|\ud83c[\ude50-\ude51]|\u203c|\u2049|[\u25aa-\u25ab]|\u25b6|\u25c0|[\u25fb-\u25fe]|\u00a9|\u00ae|\u2122|\u2139|\ud83c\udc04|[\u2600-\u26FF]|\u2b05|\u2b06|\u2b07|\u2b1b|\u2b1c|\u2b50|\u2b55|\u231a|\u231b|\u2328|\u23cf|[\u23e9-\u23f3]|[\u23f8-\u23fa]|\ud83c\udccf|\u2934|\u2935|[\u2190-\u21ff])/g;
 
+function hashCode(string) {
+  var hash = 0, i, chr;
+  if (string.length === 0) return hash;
+  for (i = 0; i < string.length; i++) {
+    chr   = string.charCodeAt(i);
+    hash  = ((hash << 5) - hash) + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return hash;
+};
 
 function hidePost(post, style) {
   setTimeout(function() {
@@ -20,95 +41,212 @@ function hidePost(post, style) {
   }, 100)
 }
 
-function getPostText(post, number) {
+function getPostText(post) {
   return post.querySelector(".postcontent").textContent;
 }
-function countDuplicates(post, number) {
-  const splitted = getPostText(post,number).split(/\s+/g);
+function getPostTime(post) {
+  let posttime = post.querySelector(".posttime")
+  if (posttime == null)
+    return null
+  return Math.round(new Date(posttime.dateTime)/1000)
+}
+//Tarkistaa onko liian paljon samankaltaisuutta
+function countDuplicates(text) {
+  const splitted = text.split(/\s+/g);
   const wordcount = new Set(splitted).size;
   const ratio = wordcount / splitted.length;
 
   if (wordcount > 0 && ratio < 0.1)
     return true;
-  else if (wordcount > 0 && getPostText(post,number).length / wordcount > 300)
+  else if (wordcount > 0 && text.length / wordcount > 300)
     return true;
   else
     return false;
 }
 
-function hideBlackList(post, number, style) {
-  for(let word of blacklist) {
-    if(getPostText(post, number).toLowerCase().indexOf(word.toLowerCase()) > -1) {
-      hidePost(post, style);
+//Antaa postauksille hash-summan ja hidettää kaikki seuraavan detect_minutes aikana tulevat identiteettiset postaukset
+function hideDuplicatePosts(post) {
+  if (getPostText(post)=="")
+    return false;
+  let hash = hashCode(getPostText(post));
+  let timestamp = getPostTime(post);
+  if (timestamp==null)
+    return false;
+  
+  let localstorage_value = getItem(hash, "posts");
+  if (localstorage_value==null) {
+    setItem(hash, "posts", timestamp);
+    return false;
+  }
+  else if (timestamp > localstorage_value + detect_minutes*60) {
+    setItem(hash, "posts", timestamp);
+    return false;
+  }
+  else if (timestamp <= localstorage_value) {
+    return false;
+  }
+  return true;
+}
+function hideBlackList(text) {
+  if (using_common_blacklist)
+    blacklist_words.concat(blacklist);
+  for(let word of blacklist_words) {
+    if(text.toLowerCase().indexOf(word.toLowerCase()) > -1)
       return true;
-    }
-    else if (emojiPattern.test(getPostText(post, number)) && blacklistEmojis)
-      hidePost(post, style);
+    else if (emojiPattern.test(text) && blacklistEmojis)
+      return true;
   }
   return false;
 }
-
-var catalog=true;
-const threadMap = {};
-var threads = document.querySelectorAll(".op_post");
-for(let thread of threads) {
-  catalog=false;
-  var hided = hideBlackList(thread, 2, ".thread-hide");
-  if (!hided) {
-    const text = getPostText(thread, 2);
-    if (threadMap[text] === undefined)
-      threadMap[text] = 1;
-    else
-      threadMap[text]++;
-    if (threadMap[text]>1)
-      hidePost(thread, ".thread-hide");
-    else if (countDuplicates(thread, 2))
-      hidePost(thread, ".thread-hide");
-    
+function detectPastas(post) {
+  let text = getPostText(post)
+  let hash = hashCode(text);
+  let timestamp = getPostTime(post);
+  if (timestamp == null)
+    return false;
+  if (text.length<800)
+    return false;
+  let localstorage_hash = getItem(hash, "pasta");
+  if (localstorage_hash==null) {
+    setItem(hash, "pasta", timestamp);
+    return false;
   }
+   else if (timestamp > localstorage_hash + pasta_expire_hours*60*60) {
+    setItem(hash, "pasta", timestamp);
+    return false;
+  }
+  else if (timestamp <= localstorage_hash) {
+    return false;
+  }
+  return true;
+}
+//testataan ulkomaisten merkkien määrä
+function detectForeign(text) {
+  let old_length = text.length;
+  if (old_length<300 || !hide_foreign_texts)
+    return false;
+  let regex=/([^\u0000-\u007F]+)/g; //unicode-characters
+  let regex2=/[äöåÄÖÅ\s]/g; //ääkköset
+  let stripped_text = text.replace(regex2,"").match(regex);
+  if (stripped_text==null)
+    return false;
+  let new_length = stripped_text.join("").length;
+  if (new_length / old_length > foreign_threshold) {
+    return true;
+  }
+  else
+    return false;
+  
 }
 
-const postMap = {};
-var answers = document.querySelectorAll(".answer");
-for(let answer of answers) {
-  var hided = hideBlackList(answer, 1, ".post-hide");
-  if (!hided) {
-    const text = getPostText(answer, 1);
-    if (postMap[text] === undefined)
-      postMap[text] = 1;
-    else
-      postMap[text]++;
-    if (postMap[text] !== undefined && postMap[text]>1 && text != "" && text.toLowerCase() != "bump")
-      hidePost(answer, ".post-hide");
-    else if (countDuplicates(answer, 1))
-      hidePost(answer, ".post-hide");
+//tunnistetaan mahdollinen floodi
+function detectFlood(post) {
+  let text = getPostText(post);
+  let rows=text.split(/\r\n|\r|\n/).length;
+  if (rows<10)
+    return false;
+  let length=text.length;
+  let timestamp=getPostTime(post);
+  if (timestamp==null)
+    return false;
+  let found=false;
+  let floodCount=0;
+  
+  for (var i=0;i<LocalStorage["flood"].length;i++) {
+    if (LocalStorage["flood"][i]["time"]==timestamp && LocalStorage["flood"][i]["rows"]==rows && LocalStorage["flood"][i]["len"]==length)
+      found=true;
+    else if (Math.abs(timestamp-LocalStorage["flood"][i]["time"]) < detect_flood_minutes*60 && Math.abs(rows-LocalStorage["flood"][i]["rows"])<=1 && Math.abs(1-length/LocalStorage["flood"][i]["len"]) < 0.2)
+      floodCount++;
   }
+  if (!found)
+    LocalStorage["flood"].push({"time":timestamp, "rows":rows, "len":length});
+  if (floodCount>=3)
+    return true;
+
 }
-if (catalog) {
-  var catalog_threads = document.querySelectorAll(".thread");
-  for(let thread of catalog_threads) {
-    var hided = hideBlackList(thread, 0, ".thread-hide");
-    if (!hided) {
-      const text = getPostText(thread, 0);
-      if (threadMap[text] === undefined)
-        threadMap[text] = 1;
-      else
-        threadMap[text]++;
-      if (threadMap[text]>1)
-        hidePost(thread, ".thread-hide");
-      else if (countDuplicates(thread, 0))
-        hidePost(thread, ".thread-hide");
-      else if (text=="") 
-        hidePost(thread, ".thread-hide");
+
+
+//Tyhjennetään localstorage-hashit viemästä tilaa, suoritetaan detect_minutes-muuttujan mukaan
+function clearOldHashes() {
+  let current_timestamp = Date.now()/1000 | 0;
+  let time_since_last_purge = LocalStorage["time_since_last_purge"];
+  if (time_since_last_purge != null && Math.floor(current_timestamp - time_since_last_purge) < detect_minutes*60)
+    return;
+  for (thread in LocalStorage["posts"]) {
+    if (Math.floor(current_timestamp - getItem(thread, "posts")) > detect_minutes*60)
+      removeItem(thread, "posts");
+  }
+  for (thread in LocalStorage["pasta"]) {
+    if (Math.floor(current_timestamp - getItem(thread, "pasta")) > pasta_expire_hours*60*60)
+      removeItem(thread, "pasta");
+  }
+  LocalStorage["time_since_last_purge"]=current_timestamp;
+}
+
+function loadLocalStorage() {
+  LocalStorage = JSON.parse(localStorage.getItem("spamminesto"));
+  if (LocalStorage == null)
+    LocalStorage = {"posts": {}, "pasta":{}, "flood":[], "time_since_last_purge":0};
+  if (!("posts" in LocalStorage))
+    LocalStorage["posts"]={};
+  if (!("pasta" in LocalStorage))
+    LocalStorage["pasta"]={};
+  if (!("flood" in LocalStorage))
+    LocalStorage["flood"]=[];
+  if (!("time_since_last_purge" in LocalStorage))
+    LocalStorage["time_since_last_purge"]=null;
+}
+function saveLocalStorage() {
+  localStorage.setItem("spamminesto", JSON.stringify(LocalStorage));
+}
+
+function getItem(key, style) {
+  return LocalStorage[style][key];
+}
+function setItem(key, style, value) {
+  LocalStorage[style][key] = value;
+}
+function removeItem(key, style) {
+  delete LocalStorage[style][key]
+}
+
+function hideLoop(post, style) {
+  const text = getPostText(post);
+  if (hideBlackList(text))
+    hidePost(post, style)
+  else if (detectForeign(text))
+    hidePost(post, style)
+  else if (countDuplicates(text))
+    hidePost(post, style)
+  else if (detectFlood(post))
+    hidePost(post, style)
+  else if (detectPastas(post))
+    hidePost(post, style)
+  else if (hideDuplicatePosts(post))
+    hidePost(post, style)
+}
+
+runSafely(() => {
+  loadLocalStorage();
+  clearOldHashes();
+  let threads = document.querySelectorAll(".thread");
+  for(let thread of threads) {
+    hideLoop(thread, ".thread-hide");
+  }
+
+  let answers = document.querySelectorAll(".answer");
+  for(let answer of answers) {
+    hideLoop(answer, ".post-hide");
+  }
+
+  setTimeout(function() {
+    let hiddenAnswers = document.querySelectorAll(".answer.hidden");
+    for (let hidden of hiddenAnswers) {
+      hidden.parentNode.removeChild(hidden);
     }
-  }
-}
-setTimeout(function() {
-  var hiddenAnswers = document.querySelectorAll(".answer.hidden");
-  for (let hidden of hiddenAnswers) {
-    hidden.parentNode.removeChild(hidden);
-  }
-  var hiddenThreads = document.querySelectorAll(".just-hidden");
-  for (let thread of hiddenThreads)
-    thread.parentNode.removeChild(thread);
-}, 300)
+    let hiddenThreads = document.querySelectorAll(".just-hidden");
+    for (let thread of hiddenThreads)
+      thread.parentNode.removeChild(thread);
+  }, 300)
+  saveLocalStorage();
+});
