@@ -4,7 +4,7 @@
 // @exclude *://ylilauta.org/hiddenthreads
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/blacklist.txt
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/runsafely.user.js
-// @version 0.51
+// @version 0.52
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
@@ -182,6 +182,10 @@ function clearOldHashes() {
     if (Math.floor(current_timestamp - getItem(thread, "pasta")) > pasta_expire_hours*60*60)
       removeItem(thread, "pasta");
   }
+  for (var i=LocalStorage["flood"].length-1;i>=0;i--) {
+    if (Math.floor(current_timestamp - LocalStorage["flood"][i]["timestamp"]) > detect_minutes*60)
+      LocalStorage["flood"].splice(i, 1);
+  }
   LocalStorage["time_since_last_purge"]=current_timestamp;
 }
 
@@ -231,6 +235,7 @@ function hideLoop(post, style) {
 runSafely(() => {
   loadLocalStorage();
   clearOldHashes();
+  console.log(LocalStorage["flood"]);
   let threads = document.querySelectorAll(".thread");
   for(let thread of threads) {
     hideLoop(thread, ".thread-hide");
