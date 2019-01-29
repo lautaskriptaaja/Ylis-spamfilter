@@ -4,7 +4,7 @@
 // @exclude *://ylilauta.org/hiddenthreads
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/blacklist.txt
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/runsafely.user.js
-// @version 0.56
+// @version 0.57
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
@@ -289,7 +289,7 @@ function hideLoop(post, style) {
 runSafely(() => {
   loadLocalStorage();
   clearOldHashes();
-  let threads = document.querySelectorAll(".thread");
+  let threads = document.querySelectorAll("div.thread");
   for(let thread of threads) {
     hideLoop(thread, ".thread-hide");
   }
