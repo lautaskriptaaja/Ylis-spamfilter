@@ -1,5 +1,6 @@
 var blacklist = [
   "💩",
   "██",
-  "󠀡"
+  "󠀡",
+  "EditWatch this page"
 ];
