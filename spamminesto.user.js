@@ -4,11 +4,13 @@
 // @exclude *://ylilauta.org/hiddenthreads
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/blacklist.txt
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/runsafely.user.js
-// @version 0.57
+// @version 0.58
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
 
+let delete_hided_threads=true; //poistaa kaikki hidetetyt langat näkyvistä, suositeltavaa olla päällä! voi tarkistaa toimivuuden https://ylilauta.org/hiddenthreads
+let delete_hided_posts=true; //poistaa hidetetyt postaukset näkyvistä. tätä on vaikeampi tarkistaa kuin ylläolevaa
 let blacklist_enabled=true; //muuttujaksi asetuksiin
 let using_common_blacklist=true; //muuttujaksi asetuksiin
 let blacklist_words = []; //muuttujaksi asetuksiin, tähän voi lisätä omia mustalista-sanoja, syntaksilla: ["sana1", "sana2", "lause kolmonen"];
@@ -300,13 +302,17 @@ runSafely(() => {
   }
 
   setTimeout(function() {
-    let hiddenAnswers = document.querySelectorAll(".answer.hidden");
-    for (let hidden of hiddenAnswers) {
-      hidden.parentNode.removeChild(hidden);
+    if (delete_hided_posts) {
+      let hiddenAnswers = document.querySelectorAll(".answer.hidden");
+      for (let hidden of hiddenAnswers) {
+        hidden.parentNode.removeChild(hidden);
+      }
     }
-    let hiddenThreads = document.querySelectorAll(".just-hidden");
-    for (let thread of hiddenThreads)
-      thread.parentNode.removeChild(thread);
+    if (delete_hided_threads) {
+      let hiddenThreads = document.querySelectorAll(".just-hidden");
+      for (let thread of hiddenThreads)
+        thread.parentNode.removeChild(thread);
+    }
   }, 300)
   saveLocalStorage();
 });
