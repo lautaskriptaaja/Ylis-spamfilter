@@ -4,7 +4,7 @@
 // @exclude *://ylilauta.org/hiddenthreads
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/blacklist.txt
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/runsafely.user.js
-// @version 0.54
+// @version 0.55
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
@@ -20,6 +20,7 @@ let hide_foreign_texts=true; //muuttujaksi asetuksiin, hidettää mikäli tunnis
 let foreign_threshold=0.1; //muuttujaksi asetuksiin, jos tekstissä on enemmän kuin tämän verran ihmemerkkejä, hideen suoraan
 let enable_flood_restriction=true; //muuttujaksi asetuksiin, melko tiukka floodin esto -menetelmä, optimointivaraa
 let detect_flood_minutes=5; //kuinka pitkältä ajalta hakee floodia
+let hide_same_videos=true; //muuttujaksi...
 let LocalStorage;
 let emojiPattern=/(?:[\u2700-\u27bf]|(?:\ud83c[\udde6-\uddff]){2}|[\ud800-\udbff][\udc00-\udfff]|[\u0023-\u0039]\ufe0f?\u20e3|\u3299|\u3297|\u303d|\u3030|\u24c2|\ud83c[\udd70-\udd71]|\ud83c[\udd7e-\udd7f]|\ud83c\udd8e|\ud83c[\udd91-\udd9a]|\ud83c[\udde6-\uddff]|[\ud83c[\ude01\uddff]|\ud83c[\ude01-\ude02]|\ud83c\ude1a|\ud83c\ude2f|[\ud83c[\ude32\ude02]|\ud83c\ude1a|\ud83c\ude2f|\ud83c[\ude32-\ude3a]|[\ud83c[\ude50\ude3a]|\ud83c[\ude50-\ude51]|\u203c|\u2049|[\u25aa-\u25ab]|\u25b6|\u25c0|[\u25fb-\u25fe]|\u00a9|\u00ae|\u2122|\u2139|\ud83c\udc04|[\u2600-\u26FF]|\u2b05|\u2b06|\u2b07|\u2b1b|\u2b1c|\u2b50|\u2b55|\u231a|\u231b|\u2328|\u23cf|[\u23e9-\u23f3]|[\u23f8-\u23fa]|\ud83c\udccf|\u2934|\u2935|[\u2190-\u21ff])/g;
 
@@ -83,12 +84,13 @@ function hideDuplicatePosts(post) {
     return false;
   }
   else if (timestamp <= localstorage_value) {
+    setItem(hash, "posts", timestamp);
     return false;
   }
   return true;
 }
 function hideBlackList(text) {
- if (using_common_blacklist)
+  if (using_common_blacklist)
     var new_list = blacklist_words.concat(blacklist);
   else
     var new_list = blacklist_words;
@@ -118,6 +120,7 @@ function detectPastas(post) {
     return false;
   }
   else if (timestamp <= localstorage_hash) {
+    setItem(hash, "pasta", timestamp);
     return false;
   }
   return true;
@@ -139,6 +142,33 @@ function detectForeign(text) {
   else
     return false;
   
+}
+
+function preventSameVideo(post) {
+  if (!hide_same_videos)
+    return false;
+  let figcaption = post.querySelector("figcaption");
+  if (figcaption==null)
+    return false;
+  let timestamp = getPostTime(post);
+  if (timestamp==null)
+    return false;
+  let hash = hashCode(figcaption.innerText);
+  let localstorage_value = getItem(hash, "videos");
+  if (localstorage_value==null) {
+    setItem(hash, "videos", timestamp);
+    return false;
+  }
+  else if (timestamp > localstorage_value + detect_minutes*60) {
+    setItem(hash, "videos", timestamp);
+    return false;
+  }
+  else if (timestamp <= localstorage_value) {
+    setItem(hash, "videos", timestamp);
+    return false;
+  }
+  return true;
+
 }
 
 //tunnistetaan mahdollinen floodi
@@ -184,6 +214,10 @@ function clearOldHashes() {
     if (Math.floor(current_timestamp - getItem(thread, "pasta")) > pasta_expire_hours*60*60)
       removeItem(thread, "pasta");
   }
+  for (thread in LocalStorage["videos"]) {
+    if (Math.floor(current_timestamp - getItem(thread, "videos")) > detect_minutes*60)
+      removeItem(thread, "videos");
+  }
   for (var i=LocalStorage["flood"].length-1;i>=0;i--) {
     if (Math.floor(current_timestamp - LocalStorage["flood"][i]["timestamp"]) > detect_minutes*60)
       LocalStorage["flood"].splice(i, 1);
@@ -194,11 +228,13 @@ function clearOldHashes() {
 function loadLocalStorage() {
   LocalStorage = JSON.parse(localStorage.getItem("spamminesto"));
   if (LocalStorage == null)
-    LocalStorage = {"posts": {}, "pasta":{}, "flood":[], "time_since_last_purge":0};
+    LocalStorage = {"posts": {}, "pasta":{}, "flood":[], "videos":{}, "time_since_last_purge":0};
   if (!("posts" in LocalStorage))
     LocalStorage["posts"]={};
   if (!("pasta" in LocalStorage))
     LocalStorage["pasta"]={};
+  if (!("videos" in LocalStorage))
+    LocalStorage["videos"]={};
   if (!("flood" in LocalStorage))
     LocalStorage["flood"]=[];
   if (!("time_since_last_purge" in LocalStorage))
@@ -221,6 +257,8 @@ function removeItem(key, style) {
 function hideLoop(post, style) {
   const text = getPostText(post);
   if (hideBlackList(text))
+    hidePost(post, style)
+  else if (preventSameVideo(post))
     hidePost(post, style)
   else if (detectForeign(text))
     hidePost(post, style)
