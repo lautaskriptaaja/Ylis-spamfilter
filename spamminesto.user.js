@@ -4,7 +4,7 @@
 // @exclude *://ylilauta.org/hiddenthreads
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/blacklist.txt
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/runsafely.user.js
-// @version 0.53
+// @version 0.54
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
@@ -88,9 +88,11 @@ function hideDuplicatePosts(post) {
   return true;
 }
 function hideBlackList(text) {
-  if (using_common_blacklist)
-    blacklist_words.concat(blacklist);
-  for(let word of blacklist_words) {
+ if (using_common_blacklist)
+    var new_list = blacklist_words.concat(blacklist);
+  else
+    var new_list = blacklist_words;
+  for(let word of new_list) {
     if(text.toLowerCase().indexOf(word.toLowerCase()) > -1)
       return true;
     else if (emojiPattern.test(text) && blacklistEmojis)
