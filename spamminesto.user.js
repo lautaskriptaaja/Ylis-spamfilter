@@ -4,7 +4,7 @@
 // @exclude *://ylilauta.org/hiddenthreads
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/blacklist.txt
 // @require https://github.com/lautaskriptaaja/Ylis-spamfilter/raw/master/runsafely.user.js
-// @version 0.58
+// @version 0.59
 // @locale en
 // @description Piilottaa langat ja vastaukset automaattisesti joissa on jokin mustalistattu sana tai luokitellaan spämmiksi
 // ==/UserScript==
@@ -153,11 +153,15 @@ function preventSameVideo(post) {
   let figcaption = post.querySelector("figcaption");
   if (figcaption==null)
     return false;
+  let url = figcaption.querySelector("a");
+  if (url==null)
+    return false;
   let timestamp = getPostTime(post);
   if (timestamp==null)
     return false;
   let hash = hashCode(figcaption.innerText);
   let localstorage_value = getItem(hash, "videos");
+  
   if (localstorage_value==null) {
     setItem(hash, "videos", timestamp);
     return false;
@@ -210,7 +214,6 @@ function detectFlood(post) {
     LocalStorage["flood"].push({"time":timestamp, "rows":rows, "len":length});
   if (floodCount>=3)
     return true;
-
 }
 
 
@@ -253,6 +256,7 @@ function loadLocalStorage() {
     LocalStorage["flood"]=[];
   if (!("time_since_last_purge" in LocalStorage))
     LocalStorage["time_since_last_purge"]=null;
+  
 }
 function saveLocalStorage() {
   localStorage.setItem("spamminesto", JSON.stringify(LocalStorage));
